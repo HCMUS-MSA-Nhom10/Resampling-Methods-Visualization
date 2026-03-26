@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resampling Visualizer</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- ══════════ TOP PANEL ══════════ -->
+  <header id="top-panel">
+    <div id="algo-tabs">
+      <button class="tab-btn active" data-algo="jackknife">Jackknife</button>
+      <button class="tab-btn" data-algo="bootstrap">Bootstrap</button>
+      <button class="tab-btn" data-algo="permutation">Permutation Test</button>
+      <button class="tab-btn" data-algo="crossvalidation">Cross-Validation</button>
+    </div>
+
+    <div id="algo-description"></div>
+
+    <div id="input-area">
+      <div id="array-input-group">
+        <label>Mảng dữ liệu:</label>
+        <div id="data-points-container"></div>
+        <div id="array-controls">
+          <input type="number" id="new-point-input" placeholder="Thêm số..." step="any"/>
+          <button id="btn-add-point">＋ Thêm</button>
+          <button id="btn-remove-point">－ Xóa cuối</button>
+          <button id="btn-random-data">🎲 Random</button>
+        </div>
+      </div>
+      <div id="algo-params"></div>
+      <button id="btn-run">▶ RUN</button>
+    </div>
+  </header>
+
+  <!-- ══════════ MIDDLE PANEL ══════════ -->
+  <main id="middle-panel">
+    <section id="viz-col">
+      <div id="step-title"></div>
+      <canvas id="viz-canvas"></canvas>
+      <svg id="viz-svg"></svg>
+    </section>
+    <section id="annotation-col">
+      <div id="step-info"></div>
+      <div id="variables-table"></div>
+    </section>
+  </main>
+
+  <!-- ══════════ BOTTOM PANEL ══════════ -->
+  <footer id="bottom-panel">
+    <button id="btn-prev" disabled>◀ Prev</button>
+    <span id="step-counter">Step — / —</span>
+    <button id="btn-next" disabled>Next ▶</button>
+    <button id="btn-reset">⟳ Reset All</button>
+  </footer>
+
+  <!-- JS modules (order matters) -->
+  <script src="js/algorithms/jackknife.js"></script>
+  <script src="js/algorithms/bootstrap.js"></script>
+  <script src="js/algorithms/permutation.js"></script>
+  <script src="js/algorithms/crossvalidation.js"></script>
+  <script src="js/visualizer/renderer.js"></script>
+  <script src="js/visualizer/annotations.js"></script>
+  <script src="js/ui/controls.js"></script>
+  <script src="js/ui/layout.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
