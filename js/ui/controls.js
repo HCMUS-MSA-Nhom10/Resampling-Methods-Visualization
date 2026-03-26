@@ -65,7 +65,9 @@ window.Controls = {
     };
     const steps = algoMap[algo].run(data, params);
     this.load(steps);
+    Distribution.update(data);   // ← cập nhật tab phân phối gốc
   },
+
 
   _render() {
     const step = this._steps[this._currentStep];

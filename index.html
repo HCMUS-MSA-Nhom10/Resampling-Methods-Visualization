@@ -16,6 +16,8 @@
       <button class="tab-btn" data-algo="bootstrap">Bootstrap</button>
       <button class="tab-btn" data-algo="permutation">Permutation Test</button>
       <button class="tab-btn" data-algo="crossvalidation">Cross-Validation</button>
+      <span class="tab-divider"></span>
+      <button class="tab-btn tab-btn--dist" data-algo="distribution">📊 Phân phối gốc</button>
     </div>
 
     <div id="algo-description"></div>
@@ -23,11 +25,13 @@
     <div id="input-area">
       <div id="array-input-group">
         <label>Mảng dữ liệu:</label>
+        <div id="data-summary" class="data-summary"></div>
         <div id="data-points-container"></div>
         <div id="array-controls">
           <input type="number" id="new-point-input" placeholder="Thêm số..." step="any"/>
           <button id="btn-add-point">＋ Thêm</button>
           <button id="btn-remove-point">－ Xóa cuối</button>
+          <input type="number" id="random-n-input" placeholder="n=..." min="1" max="100" style="width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #ccc;"/>
           <button id="btn-random-data">🎲 Random</button>
         </div>
       </div>
@@ -42,10 +46,20 @@
       <div id="step-title"></div>
       <canvas id="viz-canvas"></canvas>
       <svg id="viz-svg"></svg>
+      <!-- Distribution overlay (shown when dist tab active) -->
+      <div id="dist-overlay" style="display:none">
+        <canvas id="dist-canvas"></canvas>
+      </div>
     </section>
     <section id="annotation-col">
       <div id="step-info"></div>
       <div id="variables-table"></div>
+      <!-- Distribution stats sidebar (shown when dist tab active) -->
+      <div id="dist-sidebar" style="display:none">
+        <div id="dist-stats-title">📊 Thống kê mô tả</div>
+        <div id="dist-stats"></div>
+        <div id="dist-info"></div>
+      </div>
     </section>
   </main>
 
@@ -65,6 +79,7 @@
   <script src="js/visualizer/renderer.js"></script>
   <script src="js/visualizer/annotations.js"></script>
   <script src="js/ui/controls.js"></script>
+  <script src="js/ui/distribution.js"></script>
   <script src="js/ui/layout.js"></script>
   <script src="js/main.js"></script>
 </body>

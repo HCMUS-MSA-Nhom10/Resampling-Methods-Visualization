@@ -3,6 +3,7 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
   Renderer.init();
+  Distribution.init();
   Layout.init();
   Controls.init();
 });

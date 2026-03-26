@@ -10,10 +10,27 @@ window.Layout = {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        this.currentAlgo = btn.dataset.algo;
-        this._renderParams();
-        this._renderDescription();
-        Controls.reset();
+
+        const algo = btn.dataset.algo;
+
+        if (algo === 'distribution') {
+          // Show distribution view, hide algo controls
+          this.currentAlgo = 'distribution';
+          document.getElementById('algo-description').style.display = 'none';
+          document.getElementById('input-area').style.display = 'none';
+          Controls.reset();
+          Distribution.update(this._dataPoints);
+          Distribution.show();
+        } else {
+          // Normal algo tab
+          Distribution.hide();
+          document.getElementById('algo-description').style.display = '';
+          document.getElementById('input-area').style.display = '';
+          this.currentAlgo = algo;
+          this._renderParams();
+          this._renderDescription();
+          Controls.reset();
+        }
       });
     });
     this._renderDataPoints();
@@ -71,8 +88,23 @@ window.Layout = {
 
   _renderDataPoints() {
     const container = document.getElementById('data-points-container');
+    const summary = document.getElementById('data-summary');
     container.innerHTML = '';
-    this._dataPoints.forEach((v, i) => {
+    
+    // Update summary
+    if (this._dataPoints.length > 0) {
+      const sum = this._dataPoints.reduce((a, b) => a + b, 0);
+      const mean = (sum / this._dataPoints.length).toFixed(2);
+      summary.innerHTML = `<span>Count: ${this._dataPoints.length}</span> | <span>Mean: ${mean}</span>`;
+    } else {
+      summary.innerHTML = '';
+    }
+
+    // Limit rendering for performance if n is extreme, but usually n=100 is fine
+    const limit = 500; 
+    const pointsToRender = this._dataPoints.slice(0, limit);
+
+    pointsToRender.forEach((v, i) => {
       const chip = document.createElement('span');
       chip.className = 'data-chip';
       chip.textContent = v;
@@ -83,6 +115,14 @@ window.Layout = {
       });
       container.appendChild(chip);
     });
+    
+    if (this._dataPoints.length > limit) {
+      const more = document.createElement('span');
+      more.textContent = `... (+${this._dataPoints.length - limit} more)`;
+      more.style.fontSize = '12px';
+      more.style.color = 'var(--text-muted)';
+      container.appendChild(more);
+    }
   },
 
   addDataPoint() {
@@ -102,8 +142,16 @@ window.Layout = {
   },
 
   randomData() {
-    const n = 6 + Math.floor(Math.random() * 5);
-    this._dataPoints = Array.from({ length: n }, () => Math.round(Math.random() * 20 * 10) / 10);
+    const nInput = document.getElementById('random-n-input');
+    let n = parseInt(nInput.value);
+    if (isNaN(n) || n < 1) {
+      n = 5 + Math.floor(Math.random() * 6); // default 5-10
+    }
+    
+    // Generate n random points between 0 and 20
+    this._dataPoints = Array.from({ length: n }, () => {
+      return Math.round(Math.random() * 20 * 10) / 10;
+    });
     this._renderDataPoints();
   },
 

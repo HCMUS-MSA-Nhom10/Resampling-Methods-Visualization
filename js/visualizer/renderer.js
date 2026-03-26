@@ -176,66 +176,180 @@ window.Renderer = {
     c.fillText(`θ_full=${round4(refLine)}`, x + w, refY - 4);
   },
 
-  /* ── Bootstrap ── */
-  _drawBootstrap(d) {
+  _drawPointsGrid(data, x, y, w, h, options = {}) {
     const c = this.ctx;
-    const W = this.canvas.width, H = this.canvas.height;
-    const { data, bootSample, bootStats, thetaObs, phase, indices } = d;
     const n = data.length;
-    const R = Math.min(22, Math.floor((W - 80) / (n * 2)));
-    const xs = this._getXPositions(n, W);
+    if (n === 0) return 0;
 
-    c.fillStyle = this._colors.muted;
-    c.font = '11px JetBrains Mono';
-    c.textAlign = 'left';
-    c.fillText('Original data:', 16, 30);
+    const { 
+      radiusLimit = 18, 
+      padding = 4, 
+      highlights = [], 
+      removedIndex = -1,
+      counts = [],
+      showLabels = n <= 40
+    } = options;
+
+    // Smart grid layout
+    let cols = n <= 10 ? n : (n <= 25 ? 10 : (n <= 50 ? 15 : 20));
+    const rows = Math.ceil(n / cols);
+    const cellW = w / cols;
+    const cellH = Math.min(40, h / rows);
+    const R = Math.min(radiusLimit, cellW/2 - padding, cellH/2 - padding);
 
     data.forEach((val, i) => {
-      const isSelected = indices ? indices.includes(i) : false;
-      const count = indices ? indices.filter(idx => idx === i).length : 0;
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const px = x + col * cellW + cellW / 2;
+      const py = y + row * cellH + cellH / 2;
+
+      const isRemoved = i === removedIndex;
+      const highlight = highlights.includes(i);
+      const count = counts[i] || 0;
+
       c.beginPath();
-      c.arc(xs[i], 55, R, 0, Math.PI * 2);
-      c.fillStyle = isSelected ? this._colors.active + '44' : this._colors.normal;
+      c.arc(px, py, R, 0, Math.PI * 2);
+      c.fillStyle = isRemoved ? this._colors.removed : (highlight ? this._colors.active + '44' : this._colors.normal);
       c.fill();
-      c.strokeStyle = isSelected ? this._colors.active : this._colors.muted;
-      c.lineWidth = isSelected ? 2 : 1;
+      
+      c.strokeStyle = isRemoved ? this._colors.removed : (highlight ? this._colors.active : this._colors.muted);
+      c.lineWidth = isRemoved ? 2.5 : 1;
       c.stroke();
-      c.fillStyle = this._colors.text;
-      c.font = `${Math.max(9, R * 0.75)}px JetBrains Mono`;
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.fillText(val, xs[i], 55);
+
+      if (showLabels || isRemoved) {
+        c.fillStyle = isRemoved ? '#0d0f14' : this._colors.text;
+        c.font = `${Math.max(8, R * 0.75)}px JetBrains Mono`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(val, px, py);
+      }
+
       if (count > 1) {
         c.fillStyle = this._colors.removed;
-        c.font = 'bold 10px JetBrains Mono';
-        c.fillText(`×${count}`, xs[i], 55 - R - 6);
+        c.font = 'bold 9px JetBrains Mono';
+        c.fillText(`×${count}`, px, py - R - 4);
       }
     });
 
-    if (bootSample && phase === 'loop') {
+    return rows * cellH; // return overall height used
+  },
+
+  /* ── Jackknife ── */
+  _drawJackknife(d) {
+    const c = this.ctx;
+    const W = this.canvas.width, H = this.canvas.height;
+    const { data, removedIndex, jackSamples, thetaFull, thetaCurrent, phase } = d;
+    const n = data.length;
+
+    // Row 1: original data
+    c.fillStyle = this._colors.muted;
+    c.font = '11px JetBrains Mono';
+    c.textAlign = 'left';
+    c.fillText('Original data:', 16, 25);
+
+    const gridH = this._drawPointsGrid(data, 16, 35, W - 32, 110, { removedIndex });
+    
+    // Position for the next section depends on grid height
+    let nextY = 35 + gridH + 25;
+
+    // Row 2: subsample (nếu đang trong loop)
+    if (d.subsample && phase === 'loop') {
+      const R_sub = Math.min(20, Math.floor((W - 80) / (d.subsample.length * 2)));
       c.fillStyle = this._colors.muted;
       c.font = '11px JetBrains Mono';
       c.textAlign = 'left';
-      c.fillText('Bootstrap sample (with replacement):', 16, 110);
-      const bxs = this._getXPositions(bootSample.length, W);
-      bootSample.forEach((val, i) => {
+      c.fillText('Subsample (n−1):', 16, nextY - 10);
+      
+      const subXs = this._getXPositions(d.subsample.length, W);
+      d.subsample.forEach((val, i) => {
+        const x = subXs[i], y = nextY + 15;
         c.beginPath();
-        c.arc(bxs[i], 135, R, 0, Math.PI * 2);
+        c.arc(x, y, R_sub, 0, Math.PI * 2);
         c.fillStyle = this._colors.active + '33';
         c.fill();
         c.strokeStyle = this._colors.active;
         c.lineWidth = 1.5;
         c.stroke();
         c.fillStyle = this._colors.active;
-        c.font = `${Math.max(9, R * 0.75)}px JetBrains Mono`;
+        c.font = `${Math.max(9, R_sub * 0.75)}px JetBrains Mono`;
         c.textAlign = 'center';
         c.textBaseline = 'middle';
-        c.fillText(val, bxs[i], 135);
+        c.fillText(val, x, y);
       });
+      nextY += 50;
+    }
+
+    // Row 3: jackSamples bar chart
+    if (jackSamples.length > 0) {
+      const chartBaseY = Math.max(nextY + 10, H * 0.45);
+      const chartY = phase === 'result' ? H * 0.28 : chartBaseY;
+      c.fillStyle = this._colors.muted;
+      c.font = '11px JetBrains Mono';
+      c.textAlign = 'left';
+      c.fillText(`θ_i per iteration (${d.stat}):`, 16, chartY - 10);
+      this._drawMiniBarChart(jackSamples, thetaFull, 16, chartY, W - 32, H * 0.28);
+
+      if (phase === 'result') {
+        c.fillStyle = this._colors.train;
+        c.font = '12px JetBrains Mono';
+        c.textAlign = 'center';
+        c.fillText(`Bias: ${round4(d.bias)}  |  SE: ${round4(d.se)}  |  θ_corrected: ${round4(d.thetaFull - d.bias)}`, W / 2, H - 20);
+      }
+    }
+  },
+
+  /* ── Bootstrap ── */
+  _drawBootstrap(d) {
+    const c = this.ctx;
+    const W = this.canvas.width, H = this.canvas.height;
+    const { data, bootSample, bootStats, thetaObs, phase, indices } = d;
+    const n = data.length;
+
+    c.fillStyle = this._colors.muted;
+    c.font = '11px JetBrains Mono';
+    c.textAlign = 'left';
+    c.fillText('Original data:', 16, 25);
+
+    const counts = [];
+    if (indices) {
+      indices.forEach(idx => counts[idx] = (counts[idx] || 0) + 1);
+    }
+    const gridH = this._drawPointsGrid(data, 16, 35, W - 32, 110, { 
+      highlights: indices || [], 
+      counts 
+    });
+
+    let nextY = 35 + gridH + 25;
+
+    if (bootSample && phase === 'loop') {
+      const R_boot = Math.min(20, Math.floor((W - 80) / (bootSample.length * 2)));
+      c.fillStyle = this._colors.muted;
+      c.font = '11px JetBrains Mono';
+      c.textAlign = 'left';
+      c.fillText('Bootstrap sample (with replacement):', 16, nextY - 10);
+      
+      const bxs = this._getXPositions(bootSample.length, W);
+      bootSample.forEach((val, i) => {
+        const x = bxs[i], y = nextY + 15;
+        c.beginPath();
+        c.arc(x, y, R_boot, 0, Math.PI * 2);
+        c.fillStyle = this._colors.active + '33';
+        c.fill();
+        c.strokeStyle = this._colors.active;
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.fillStyle = this._colors.active;
+        c.font = `${Math.max(9, R_boot * 0.75)}px JetBrains Mono`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(val, x, y);
+      });
+      nextY += 50;
     }
 
     if (bootStats.length > 0) {
-      const chartY = phase === 'result' ? H * 0.2 : H * 0.45;
+      const chartBaseY = Math.max(nextY + 10, H * 0.45);
+      const chartY = phase === 'result' ? H * 0.25 : chartBaseY;
       c.fillStyle = this._colors.muted;
       c.font = '11px JetBrains Mono';
       c.textAlign = 'left';
@@ -256,62 +370,68 @@ window.Renderer = {
     const c = this.ctx;
     const W = this.canvas.width, H = this.canvas.height;
     const { dataA, dataB, permA, permB, permStats, obsStatistic, phase, tCurrent } = d;
-    const allData = [...dataA, ...dataB];
-    const n = allData.length;
-    const R = Math.min(20, Math.floor((W - 80) / (n * 2)));
-
-    // Draw combined data with original color coding
+    
+    // Group A Title
     c.fillStyle = this._colors.muted;
     c.font = '11px JetBrains Mono';
     c.textAlign = 'left';
-    c.fillText(`Nhóm A (n=${dataA.length}):`, 16, 30);
-    c.fillStyle = this._colors.groupA;
-    c.fillText(`Nhóm B (n=${dataB.length}):`, 16, 80);
-
-    const xsA = this._getXPositions(dataA.length, W * 0.45, 20);
-    const xsB = this._getXPositions(dataB.length, W * 0.45, W * 0.53);
-
-    dataA.forEach((val, i) => {
-      c.beginPath(); c.arc(xsA[i], 50, R, 0, Math.PI*2);
-      c.fillStyle = this._colors.groupA + '44'; c.fill();
-      c.strokeStyle = this._colors.groupA; c.lineWidth = 1.5; c.stroke();
-      c.fillStyle = this._colors.groupA; c.font = `${Math.max(9, R*0.75)}px JetBrains Mono`;
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(val, xsA[i], 50);
+    c.fillText(`Nhóm A (n=${dataA.length}):`, 16, 25);
+    
+    // Use half width minus margin for each group side-by-side
+    const groupW = (W / 2) - 24;
+    
+    // Draw Group A grid
+    const gridHA = this._drawPointsGrid(dataA, 16, 35, groupW, 100, { 
+      radiusLimit: 14, 
+      showLabels: dataA.length <= 30 
     });
-    dataB.forEach((val, i) => {
-      c.beginPath(); c.arc(xsB[i], 50, R, 0, Math.PI*2);
-      c.fillStyle = this._colors.groupB + '44'; c.fill();
-      c.strokeStyle = this._colors.groupB; c.lineWidth = 1.5; c.stroke();
-      c.fillStyle = this._colors.groupB; c.font = `${Math.max(9, R*0.75)}px JetBrains Mono`;
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(val, xsB[i], 50);
+    
+    // Group B Title (on the right)
+    c.fillStyle = this._colors.groupA; 
+    c.fillText(`Nhóm B (n=${dataB.length}):`, W / 2 + 8, 25);
+    
+    // Draw Group B grid
+    const gridHB = this._drawPointsGrid(dataB, W / 2 + 8, 35, groupW, 100, { 
+      radiusLimit: 14, 
+      showLabels: dataB.length <= 30 
     });
 
+    let nextY = 35 + Math.max(gridHA, gridHB) + 25;
+
+    // Phase Loop: Draw Permuted Samples
     if (permA && phase === 'loop') {
       c.fillStyle = this._colors.muted;
       c.font = '11px JetBrains Mono';
       c.textAlign = 'left';
-      c.fillText('Permuted A*:', 16, 110); c.fillText('Permuted B*:', W/2+10, 110);
-      const pxsA = this._getXPositions(permA.length, W * 0.45, 20);
-      const pxsB = this._getXPositions(permB.length, W * 0.45, W * 0.53);
-      const drawRow = (arr, xs, y, color) => arr.forEach((val, i) => {
-        c.beginPath(); c.arc(xs[i], y, R, 0, Math.PI*2);
-        c.fillStyle = color + '33'; c.fill();
-        c.strokeStyle = color; c.lineWidth = 1.5; c.stroke();
-        c.fillStyle = color; c.font = `${Math.max(9, R*0.75)}px JetBrains Mono`;
-        c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(val, xs[i], y);
+      c.fillText('Permuted A*:', 16, nextY - 10);
+      c.fillText('Permuted B*:', W / 2 + 8, nextY - 10);
+
+      const pGridHA = this._drawPointsGrid(permA, 16, nextY + 5, groupW, 100, { 
+        radiusLimit: 14, 
+        showLabels: permA.length <= 30 
       });
-      drawRow(permA, pxsA, 135, this._colors.groupA);
-      drawRow(permB, pxsB, 135, this._colors.groupB);
+      const pGridHB = this._drawPointsGrid(permB, W / 2 + 8, nextY + 5, groupW, 100, { 
+        radiusLimit: 14, 
+        showLabels: permB.length <= 30 
+      });
+      
+      nextY += Math.max(pGridHA, pGridHB) + 30;
     }
 
     if (permStats.length > 0) {
-      const chartY = H * 0.45;
-      c.fillStyle = this._colors.muted; c.font = '11px JetBrains Mono'; c.textAlign = 'left';
+      const chartBaseY = Math.max(nextY + 10, H * 0.45);
+      const chartY = phase === 'result' ? H * 0.3 : chartBaseY;
+      c.fillStyle = this._colors.muted; 
+      c.font = '11px JetBrains Mono'; 
+      c.textAlign = 'left';
       c.fillText('Phân phối T* (permutation):', 16, chartY - 10);
       this._drawMiniBarChart(permStats, obsStatistic, 16, chartY, W - 32, H * 0.32);
+      
       if (phase === 'result') {
-        c.fillStyle = this._colors.train; c.font = '12px JetBrains Mono'; c.textAlign = 'center';
-        c.fillText(`p-value = ${round4(d.pValue)}  ${d.pValue < 0.05 ? '→ Bác bỏ H0' : '→ Không bác bỏ H0'}`, W/2, H - 20);
+        c.fillStyle = this._colors.train; 
+        c.font = '12px JetBrains Mono'; 
+        c.textAlign = 'center';
+        c.fillText(`p-value = ${round4(d.pValue)}  ${d.pValue < 0.05 ? '→ Bác bỏ H0' : '→ Không bác bỏ H0'}`, W / 2, H - 20);
       }
     }
   },
